@@ -1,0 +1,147 @@
+name: "logisticotrain"
+
+services:
+
+  restapi: # REST API service
+    image: restapi
+    build:
+      context: ./RESTApi
+      dockerfile: Dockerfile
+    ports:
+      - 5000:5000
+    depends_on:
+      sqldatabase:
+        condition: service_healthy
+      nosqldatabase:
+        condition: service_healthy
+    networks:
+      - db-net
+    environment:
+      - SQLDB_HOST=sqldatabase
+      - MONGODB_HOST=nosqldatabase
+    volumes:
+      - ./RESTApi/config.py:/app/config.py
+      - ./init-mariadb.sql:/docker-entrypoint-initdb.d/init-mariadb.sql
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/rames"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    configs:
+      - source: init-sql-db
+        target: /docker-entrypoint-initdb.d/init-mariadb.sql
+
+  sqldatabase:
+    image: mariadb:11
+    networks:
+      - db-net
+    environment:
+      MARIADB_DATABASE: myrames-prod-db
+      MARIADB_USER: mariaUsr
+      MARIADB_PASSWORD: mariaPwd
+      MARIADB_ROOT_PASSWORD: rootkjkj
+    ports:
+      - 3306:3306
+    volumes:
+      - sqldb-data:/var/lib/mysql
+    restart: always
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh", "--connect"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+  phpmyadmin:
+    image: phpmyadmin:5
+    profiles:
+      - dev-tool
+    depends_on:
+      - sqldatabase
+    restart: always
+    environment:
+      PMA_HOST: sqldatabase
+      PMA_PORT: 3306
+      PMA_USER: mariaUsr
+      PMA_PASSWORD: mariaPwd
+    ports:
+      - "127.0.0.1:8888:80"
+    networks:
+      - db-net
+
+  broker:
+    image: rabbitmq:3.12
+    networks:
+      - broker-net
+    container_name: broker
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_PASS: brokerpass
+      RABBITMQ_DEFAULT_USER: brokerusr
+    restart: always
+    command: >
+      sh -c "rabbitmq-plugins enable rabbitmq_stomp &&
+             rabbitmq-plugins enable rabbitmq_management &&
+             rabbitmq-server"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s 
+
+  nosqldatabase:
+    image: mongo:6.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongoUsr
+      MONGO_INITDB_ROOT_PASSWORD: mongoPass
+      MONGO_INITDB_DATABASE: admin
+    volumes:
+      - history-db:/data/db
+    networks:
+      - db-net
+    restart: always
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    configs:
+      - source: init-nosql-db
+        target: /docker-entrypoint-initdb.d/init-mongo.js
+
+  mongo-express:
+    image: mongo-express
+    profiles:
+      - mongoUsr
+    restart: always
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: mongoUsr
+      ME_CONFIG_MONGODB_ADMINPASSWORD: mongoPass
+      ME_CONFIG_MONGODB_URL: mongodb://mongoUsr:mongoPass@nosqldatabase:27017/
+      ME_CONFIG_BASICAUTH: false
+    networks:
+      - db-net
+    volumes:
+      - ./RESTApi/config.py:/app/config.py:ro
+
+networks:
+  front-net:
+  broker-net:
+  db-net:
+
+volumes:
+  sqldb-data:
+  history-db:
+
+configs:
+  nginx-conf:
+    file: ./nginx.conf
+  init-nosql-db:
+    file: ./init-mongo.js
+  init-sql-db:
+    file: ./init-mariadb.sql
