@@ -3,7 +3,6 @@ name: "logisticotrain"
 services:
 
   restapi:
-    # REST API service
     image: restapi
     build:
       context: ./RESTApi
@@ -53,6 +52,7 @@ services:
       timeout: 10s
       retries: 10
       start_period: 20s
+
   phpmyadmin:
     image: phpmyadmin:5
     profiles:
@@ -132,16 +132,34 @@ services:
     volumes:
       - ./RESTApi/config.py:/app/config.py:ro
 
+  wsapi:
+    image: maven:3.9-amazoncorretto-21
+    container_name: wsapi
+    volumes:
+      - ./LogisticoTrain_codebase/RealtimeAPI:/usr/src/RealtimeAPI
+      - ./maven_cache:/root/.m2
+    working_dir: /usr/src/RealtimeAPI
+    command: >
+      sh -c "mvn spring-boot:run"
+    depends_on:
+      sqldatabase:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+    networks:
+      - broker-net
+      - front-net
+    ports:
+      - "8080:8080"
+
 networks:
   front-net:
   broker-net:
   db-net:
 
-
 volumes:
   sqldb-data:
   history-db:
-
 
 configs:
   nginx-conf:
