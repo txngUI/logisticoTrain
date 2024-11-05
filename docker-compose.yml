@@ -2,7 +2,8 @@ name: "logisticotrain"
 
 services:
 
-  restapi: # REST API service
+  restapi:
+    # REST API service
     image: restapi
     build:
       context: ./RESTApi
@@ -23,7 +24,7 @@ services:
       - ./RESTApi/config.py:/app/config.py
       - ./init-mariadb.sql:/docker-entrypoint-initdb.d/init-mariadb.sql
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/rames"]
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/api/v1/rames" ]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -47,7 +48,7 @@ services:
       - sqldb-data:/var/lib/mysql
     restart: always
     healthcheck:
-      test: ["CMD", "/usr/local/bin/healthcheck.sh", "--connect"]
+      test: [ "CMD", "/usr/local/bin/healthcheck.sh", "--connect" ]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -86,11 +87,11 @@ services:
              rabbitmq-plugins enable rabbitmq_management &&
              rabbitmq-server"
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 10s
       timeout: 10s
       retries: 10
-      start_period: 20s 
+      start_period: 20s
 
   nosqldatabase:
     image: mongo:6.0
@@ -102,9 +103,11 @@ services:
       - history-db:/data/db
     networks:
       - db-net
+    ports:
+      - 27017:27017
     restart: always
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -115,7 +118,7 @@ services:
   mongo-express:
     image: mongo-express
     profiles:
-      - mongoUsr
+      - dev-tool
     restart: always
     ports:
       - 8081:8081
@@ -134,9 +137,11 @@ networks:
   broker-net:
   db-net:
 
+
 volumes:
   sqldb-data:
   history-db:
+
 
 configs:
   nginx-conf:
