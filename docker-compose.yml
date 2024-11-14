@@ -8,7 +8,7 @@ services:
       context: ./RESTApi
       dockerfile: Dockerfile
     ports:
-      - 5000:5000
+      - 5001:5001
     depends_on:
       sqldatabase:
         condition: service_healthy
@@ -152,6 +152,37 @@ services:
     ports:
       - "8080:8080"
 
+  front:
+    image: nginx:1.25-alpine
+    restart: always
+    configs:
+      - source: nginx-conf
+        target: /vendorConfigurations/nginx.conf
+    volumes:
+      - app-static:/var/www/app:ro
+    networks:
+      - front-net
+    depends_on:
+      - restapi
+      # - wsapi
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  webapp:
+    image: node:22-alpine
+    profiles:
+      - build
+    working_dir: /app
+    volumes:
+      - ./app:/app
+      - app-static:/app/build
+    command: sh -c "npm install && npm run build"
+    networks:
+      - front-net
+
 networks:
   front-net:
   broker-net:
@@ -160,6 +191,7 @@ networks:
 volumes:
   sqldb-data:
   history-db:
+  app-static:
 
 configs:
   nginx-conf:
