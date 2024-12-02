@@ -23,7 +23,7 @@ services:
       - ./RESTApi/config.py:/app/config.py
       - ./init-mariadb.sql:/docker-entrypoint-initdb.d/init-mariadb.sql
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5000/api/v1/rames" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:5001/api/v1/rames" ]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -38,9 +38,9 @@ services:
       - db-net
     environment:
       MARIADB_DATABASE: myrames-prod-db
-      MARIADB_USER: mariaUsr
-      MARIADB_PASSWORD: mariaPwd
-      MARIADB_ROOT_PASSWORD: rootkjkj
+      MARIADB_USER_FILE: /run/secrets/maria_user
+      MARIADB_PASSWORD_FILE: /run/secrets/maria_password
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/maria_root_password
     ports:
       - 3306:3306
     volumes:
@@ -52,6 +52,10 @@ services:
       timeout: 10s
       retries: 10
       start_period: 20s
+    secrets:
+      - maria_user
+      - maria_password
+      - maria_root_password
 
   phpmyadmin:
     image: phpmyadmin:5
@@ -63,12 +67,15 @@ services:
     environment:
       PMA_HOST: sqldatabase
       PMA_PORT: 3306
-      PMA_USER: mariaUsr
-      PMA_PASSWORD: mariaPwd
+      PMA_USER_FILE: /run/secrets/maria_user
+      PMA_PASSWORD_FILE: /run/secrets/maria_password
     ports:
       - "127.0.0.1:8888:80"
     networks:
       - db-net
+    secrets:
+      - maria_user
+      - maria_password
 
   broker:
     image: rabbitmq:3.12
@@ -96,8 +103,8 @@ services:
   nosqldatabase:
     image: mongo:6.0
     environment:
-      MONGO_INITDB_ROOT_USERNAME: mongoUsr
-      MONGO_INITDB_ROOT_PASSWORD: mongoPass
+      MONGO_INITDB_ROOT_USERNAME_FILE: /run/secrets/mongo_root_username
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongo_root_password
       MONGO_INITDB_DATABASE: admin
     volumes:
       - history-db:/data/db
@@ -111,6 +118,9 @@ services:
       interval: 10s
       timeout: 10s
       retries: 10
+    secrets:
+      - mongo_root_username
+      - mongo_root_password
     configs:
       - source: init-nosql-db
         target: /docker-entrypoint-initdb.d/init-mongo.js
@@ -123,10 +133,16 @@ services:
     ports:
       - 8081:8081
     environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: mongoUsr
-      ME_CONFIG_MONGODB_ADMINPASSWORD: mongoPass
-      ME_CONFIG_MONGODB_URL: mongodb://mongoUsr:mongoPass@nosqldatabase:27017/
-      ME_CONFIG_BASICAUTH: false
+      - ME_CONFIG_MONGODB_SERVER=nosqldatabase
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_MONGODB_ADMINUSERNAME_FILE=/run/secrets/mongo_root_username
+      - ME_CONFIG_MONGODB_ADMINPASSWORD_FILE=/run/secrets/mongo_root_password
+      - ME_CONFIG_BASICAUTH=false
+      - ME_CONFIG_BASICAUTH_USERNAME_FILE=/run/secrets/mongo_root_username
+      - ME_CONFIG_BASICAUTH_PASSWORD_FILE=/run/secrets/mongo_root_password
+    secrets:
+      - mongo_root_username
+      - mongo_root_password
     networks:
       - db-net
     volumes:
@@ -148,55 +164,64 @@ services:
         condition: service_healthy
     networks:
       - broker-net
-      - front-net
+      - db-net
     ports:
       - "8080:8080"
 
   front:
     image: nginx:1.25-alpine
     restart: always
-    configs:
-      - source: nginx-conf
-        target: /vendorConfigurations/nginx.conf
-    volumes:
-      - app-static:/var/www/app:ro
-    networks:
-      - front-net
     depends_on:
       - restapi
-      # - wsapi
+      - wsapi
+    ports:
+      - 80:80
+    volumes:
+      - ./vendorConfigurations/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./app/build:/var/www/app:ro
+    networks:
+      - db-net
+      - broker-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost" ]
       interval: 10s
       timeout: 10s
       retries: 10
+      start_period: 20s
 
   webapp:
     image: node:22-alpine
     profiles:
       - build
-    working_dir: /app
+    working_dir: /usr/src/app
     volumes:
-      - ./app:/app
-      - app-static:/app/build
-    command: sh -c "npm install && npm run build"
-    networks:
-      - front-net
+      - ./app:/usr/src/app
+    command: [ "npm", "run", "build" ]
 
 networks:
-  front-net:
   broker-net:
   db-net:
+
 
 volumes:
   sqldb-data:
   history-db:
-  app-static:
+
 
 configs:
-  nginx-conf:
-    file: ./nginx.conf
   init-nosql-db:
     file: ./init-mongo.js
   init-sql-db:
     file: ./init-mariadb.sql
+
+secrets:
+  mongo_root_username:
+    file: ./secrets/mongo_root_username.txt
+  mongo_root_password:
+    file: ./secrets/mongo_root_password.txt
+  maria_user:
+    file: ./secrets/maria_user.txt
+  maria_password:
+    file: ./secrets/maria_password.txt
+  maria_root_password:
+    file: ./secrets/maria_root_password.txt
