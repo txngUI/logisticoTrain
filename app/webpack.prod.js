@@ -1,29 +1,29 @@
 /* eslint-disable import/no-extraneous-dependencies */
-const path = require('path'); // module node de manipulation de chemins de fichiers
-const fs = require('fs'); // module node d'accès au SGF
-const webpack = require('webpack'); // webpack
+const path = require("path"); // module node de manipulation de chemins de fichiers
+const fs = require("fs"); // module node d'accès au SGF
+const webpack = require("webpack"); // webpack
 // const CopyWebpackPlugin = require('copy-webpack-plugin'); // Plugin de copie directe de fichiers
-const HtmlWebpackPlugin = require('html-webpack-plugin'); // Plugin de création HTML
-const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
-const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
-const packageInfo = require('./package.json'); // info générale de l'app
-const babelConfig = require('./babel.config'); // Info de config de babel
+const HtmlWebpackPlugin = require("html-webpack-plugin"); // Plugin de création HTML
+const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer");
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
+const packageInfo = require("./package.json"); // info générale de l'app
+const babelConfig = require("./babel.config"); // Info de config de babel
 
-const PUBLIC_PATH = process.env.PUBLIC_PATH ?? '/'; // url de base de l'appli
-const API_BASE_URL = process.env.API_EP_URI ?? 'http://localhost:5001/api/rest';
-const RT_API_BASE_URL = process.env.RT_API_EP_URI ?? 'http://127.0.0.1:8080';
+const PUBLIC_PATH = process.env.PUBLIC_PATH ?? "/"; // url de base de l'appli
+const API_BASE_URL = process.env.API_EP_URI ?? "http://localhost/api/v1";
+const RT_API_BASE_URL = process.env.RT_API_EP_URI ?? "http://localhost/wsapi";
 
 module.exports = {
-  mode: 'production',
+  mode: "production",
   // Environnement cible du déploiement
-  target: 'web',
+  target: "web",
   // Point d'entrée de l'application
-  entry: './src/index.jsx',
+  entry: "./src/index.jsx",
   // Sortie
   output: {
-    path: path.join(__dirname, 'build'), // chemin obligatoirement absolu
-    filename: '[name].[contenthash].bundle.js', // Ajout un hash pour s'assurer le telechargement du nouveau code produit par le navigateur
+    path: path.join(__dirname, "build"), // chemin obligatoirement absolu
+    filename: "[name].[contenthash].bundle.js", // Ajout un hash pour s'assurer le telechargement du nouveau code produit par le navigateur
     publicPath: PUBLIC_PATH,
     clean: true, // efface le contenu du dossier de sortie avant regénération
   },
@@ -42,102 +42,110 @@ module.exports = {
     // }),
     // Génération du fichier index.html à partir d'un template
     new HtmlWebpackPlugin({
-      template: './src/index.html',
-      filename: 'index.html',
-      inject: 'body',
+      template: "./src/index.html",
+      filename: "index.html",
+      inject: "body",
       title: packageInfo.appTitle,
-      favicon: './src/favicon.ico',
+      favicon: "./src/favicon.ico",
       meta: {
-        description: packageInfo?.description ?? 'no description',
-        keywords: packageInfo?.keywords?.join(', ') ?? '',
-        author: packageInfo?.author ?? 'unknown',
+        description: packageInfo?.description ?? "no description",
+        keywords: packageInfo?.keywords?.join(", ") ?? "",
+        author: packageInfo?.author ?? "unknown",
       },
     }),
     // Séparation des CSS du code JS dans des fichiers séparés
     new MiniCssExtractPlugin({
-      filename: '[name].[contenthash].css',
+      filename: "[name].[contenthash].css",
     }),
     // Injections des licences
-    new webpack.BannerPlugin(fs.readFileSync('./LICENSE', 'utf8')),
+    new webpack.BannerPlugin(fs.readFileSync("./LICENSE", "utf8")),
     // Creation de rapports statistiques sur la taille des bundles
     new BundleAnalyzerPlugin({
-      analyzerMode: 'static',
-      reportFilename: '../buildInfos/report.html',
+      analyzerMode: "static",
+      reportFilename: "../buildInfos/report.html",
       generateStatsFile: true,
-      statsFilename: '../buildInfos/stats.json',
+      statsFilename: "../buildInfos/stats.json",
     }),
   ],
   // définit comment les modules vont être chargés
   // //ajoute les extensions .jsx et .scss aux extensions gérées
   resolve: {
-    extensions: ['.js', '.json', '.jsx', '.scss', '.wasm'],
+    extensions: [".js", ".json", ".jsx", ".scss", ".wasm"],
   },
   // modules de configuration selon le type de fichier rencontré
   module: {
-    rules: [{
-      // Gestion des fichiers css
-      test: /\.css$/i,
-      use: [
-        // Injection du CSS dans un fichier séparé
-        MiniCssExtractPlugin.loader,
-        // Interprête le CSS en CommonJS et autorise les modules
-        // les fichiers sont générés en mode dev. (car devtool activté)
-        { loader: 'css-loader', options: { modules: true } },
-      ],
-    }, {
-      // Gestion des fichiers sass de l'appli (modules css par défaut)
-      test: /\.s[ac]ss$/i,
-      exclude: /bootstrap-config\.s[ac]ss$/i,
-      use: [
-        MiniCssExtractPlugin.loader,
-        { loader: 'css-loader', options: { modules: true } },
-        // Compile les instruction sass en css
-        'sass-loader',
-      ],
-    }, {
-      // Gestion du fichier sass de chargement de chargement / custome de boostrap
-      test: /bootstrap-config\.s[ac]ss$/i,
-      use: [
-        MiniCssExtractPlugin.loader,
-        { loader: 'css-loader', options: { modules: false } },
-        'sass-loader',
-      ],
-    }, {
-      // Gestion des fichiers images
-      test: /\.(png|svg|jpg|jpeg|gif)$/i,
-      type: 'asset/resource', // le module asset émet un fichier séparé du bundle et exporte son url
-    }, {
-      // Gestion des polices d'écriture
-      test: /\.(woff|woff2|eot|ttf|otf)$/i,
-      type: 'asset/resource', // le module asset émet un fichier séparé du bundle et exporte son url
-    }, {
-      // Gestion du code-source js et jsx en utilisant babel pour
-      // la transpilation
-      // Exclut les fichiers js de node_modules du passage par babel
-      test: /\.js|\.jsx?$/,
-      exclude: /(node_modules)/,
-      use: {
-        loader: 'babel-loader',
-        options: babelConfig, // configuration séparé car ré-utilisé avec eslint
+    rules: [
+      {
+        // Gestion des fichiers css
+        test: /\.css$/i,
+        use: [
+          // Injection du CSS dans un fichier séparé
+          MiniCssExtractPlugin.loader,
+          // Interprête le CSS en CommonJS et autorise les modules
+          // les fichiers sont générés en mode dev. (car devtool activté)
+          { loader: "css-loader", options: { modules: true } },
+        ],
       },
-    }],
+      {
+        // Gestion des fichiers sass de l'appli (modules css par défaut)
+        test: /\.s[ac]ss$/i,
+        exclude: /bootstrap-config\.s[ac]ss$/i,
+        use: [
+          MiniCssExtractPlugin.loader,
+          { loader: "css-loader", options: { modules: true } },
+          // Compile les instruction sass en css
+          "sass-loader",
+        ],
+      },
+      {
+        // Gestion du fichier sass de chargement de chargement / custome de boostrap
+        test: /bootstrap-config\.s[ac]ss$/i,
+        use: [
+          MiniCssExtractPlugin.loader,
+          { loader: "css-loader", options: { modules: false } },
+          "sass-loader",
+        ],
+      },
+      {
+        // Gestion des fichiers images
+        test: /\.(png|svg|jpg|jpeg|gif)$/i,
+        type: "asset/resource", // le module asset émet un fichier séparé du bundle et exporte son url
+      },
+      {
+        // Gestion des polices d'écriture
+        test: /\.(woff|woff2|eot|ttf|otf)$/i,
+        type: "asset/resource", // le module asset émet un fichier séparé du bundle et exporte son url
+      },
+      {
+        // Gestion du code-source js et jsx en utilisant babel pour
+        // la transpilation
+        // Exclut les fichiers js de node_modules du passage par babel
+        test: /\.js|\.jsx?$/,
+        exclude: /(node_modules)/,
+        use: {
+          loader: "babel-loader",
+          options: babelConfig, // configuration séparé car ré-utilisé avec eslint
+        },
+      },
+    ],
   },
   optimization: {
-    moduleIds: 'deterministic', // les ids de modules sont calculés de manière à ne pas changer sur le module ne change pas
-    runtimeChunk: 'single', // Créer un seul runtime code pour l'ensemble des chunks
-    splitChunks: { // Met à part les codes des biblio tierces
+    moduleIds: "deterministic", // les ids de modules sont calculés de manière à ne pas changer sur le module ne change pas
+    runtimeChunk: "single", // Créer un seul runtime code pour l'ensemble des chunks
+    splitChunks: {
+      // Met à part les codes des biblio tierces
       cacheGroups: {
         vendor: {
           test: /[\\/]node_modules[\\/]/,
-          name: 'vendors',
-          chunks: 'all',
+          name: "vendors",
+          chunks: "all",
         },
       },
     },
     minimizer: [
-      '...', // utilise les paramètres par défaut des minimzer (TerserPlugin pour minifier et minimiser JS)
+      "...", // utilise les paramètres par défaut des minimzer (TerserPlugin pour minifier et minimiser JS)
       new CssMinimizerPlugin(), // minimise CSS
     ],
   },
-  devtool: 'source-map', // genere des source map pour la prod
+  devtool: "source-map", // genere des source map pour la prod
 };
