@@ -44,7 +44,10 @@ A la place nous avons mis : "sass": "^1.64.2",
 
 #### npm install && npm run build
 
-- ICI EXPLIQUER NOTRE PROBLEME
+- Nous avons également des problèmes avec nos api :
+    - WSAPI: s'exit une fois son build terminé.
+    - RESTAPI: ne démarre plus
+- Ces erreurs sont apparu du jour au lendemain alors que notre projet fonctionnait auparavant et nous n'avons pas su les corriger a temps.
 
 ## Améliorations Futures
 
